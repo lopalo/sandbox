@@ -1,0 +1,3 @@
+[submodule "server/sulaco"]
+	path = server/sulaco
+	url = https://github.com/lopalo/sulaco.git

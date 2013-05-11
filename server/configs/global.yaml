@@ -1,0 +1,23 @@
+
+message_broker:
+  sub_address: 'ipc://run/message_broker_sub'
+  pub_address: 'ipc://run/message_broker_pub'
+
+outer_server:
+  location_handler_path: location
+  client_location_handler_path: location
+
+user:
+  start_locations: [loc_1]
+
+location_manager:
+  pub_address: 'ipc://run/location_manager_pub'
+  rep_address: 'ipc://run/location_manager_rep'
+  pull_address: 'ipc://run/location_manager_pull'
+  max_heartbeat_silence: 10 # seconds
+  heartbeats_checker_period: 0.5 # seconds
+
+
+location:
+  heartbeat_period: 1 # seconds
+
