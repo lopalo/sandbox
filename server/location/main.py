@@ -1,10 +1,13 @@
 import argparse
 import logging
 
-from sulaco.utils import Config
+from sulaco.utils import Config, UTCFormatter
 from sulaco.utils.zmq import install
 from sulaco.utils.receiver import message_receiver, INTERNAL_SIGN
 from sulaco.location_server.gateway import Gateway
+
+
+logger = logging.getLogger(__name__)
 
 
 class Root(object):
@@ -17,8 +20,14 @@ class Root(object):
 
 def main(options):
     install()
-    level = logging.DEBUG if options.debug else logging.INFO
-    logging.basicConfig(level=level)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG if options.debug else logging.INFO)
+    logger.propagate = False
+    handler = logging.StreamHandler()
+    handler.setFormatter(UTCFormatter())
+    logger.addHandler(handler)
+
     config = Config.load_yaml(options.config)
     gateway = Gateway(config, options.ident)
     root = Root(gateway, options.ident, config)

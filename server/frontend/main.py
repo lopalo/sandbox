@@ -10,10 +10,13 @@ from sulaco.outer_server.connection_manager import (
 from sulaco.utils.receiver import (
     message_receiver, message_router, LoopbackMixin,
     ProxyMixin, USER_SIGN, INTERNAL_USER_SIGN, INTERNAL_SIGN)
-from sulaco.utils import Config, Sender
+from sulaco.utils import Config, UTCFormatter
 from sulaco.utils.zmq import install
 from sulaco.outer_server.message_manager import MessageManager
 from sulaco.outer_server.message_manager import Root as ABCRoot
+
+
+logger = logging.getLogger(__name__)
 
 
 class Root(ABCRoot, LoopbackMixin):
@@ -49,8 +52,14 @@ class ConnManager(LocationMixin, DistributedConnectionManager):
 
 def main(options):
     install()
-    level = logging.DEBUG if options.debug else logging.INFO
-    logging.basicConfig(level=level)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG if options.debug else logging.INFO)
+    logger.propagate = False
+    handler = logging.StreamHandler()
+    handler.setFormatter(UTCFormatter())
+    logger.addHandler(handler)
+
     config = Config.load_yaml(options.config)
     msgman = MessageManager(config)
     msgman.connect()
