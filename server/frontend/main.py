@@ -1,45 +1,20 @@
 import argparse
 import logging
-from random import choice
 
 from tornado.ioloop import IOLoop
 from sulaco.outer_server.tcp_server import TCPServer, SimpleProtocol
 from sulaco.outer_server.connection_manager import (
     DistributedConnectionManager,
     ConnectionHandler, LocationMixin)
-from sulaco.utils.receiver import (
-    message_receiver, message_router, LoopbackMixin,
-    ProxyMixin, USER_SIGN, INTERNAL_USER_SIGN, INTERNAL_SIGN)
+
 from sulaco.utils import Config, UTCFormatter
 from sulaco.utils.zmq import install
 from sulaco.outer_server.message_manager import MessageManager
-from sulaco.outer_server.message_manager import Root as ABCRoot
+from sulaco.redis import RedisNodes, Client, ConnectionPool
 
+from frontend.root import Root
 
 logger = logging.getLogger(__name__)
-
-
-class Root(ABCRoot, LoopbackMixin):
-
-    def __init__(self, config, connman, msgman):
-        super().__init__()
-        self._config = config
-        self._connman = connman
-        self._msgman = msgman
-        #TODO: generate server id
-
-    @message_receiver()
-    def sign_id(self, username, conn, loc=None, **kwargs):
-        #TODO: Save server id in user and check it all time when
-        #      user will be loaded from db.
-        #      Disconnect if server id is wrong.
-        pass
-
-    def location_added(self, loc_id):
-        pass
-
-    def location_removed(self, loc_id):
-        pass
 
 
 class Protocol(ConnectionHandler, SimpleProtocol):
@@ -48,6 +23,26 @@ class Protocol(ConnectionHandler, SimpleProtocol):
 
 class ConnManager(LocationMixin, DistributedConnectionManager):
     pass
+
+
+def setup_dbs(config):
+    def check_result(future):
+        try:
+            future.result()
+        except Exception:
+            logger.exception("DB check is failed")
+            IOLoop.instance().stop()
+
+    nodes = RedisNodes(nodes=config.outer_server.db_nodes)
+    nodes.check_nodes().add_done_callback(check_result)
+
+    conf = config.outer_server.name_db
+    connection_pool = ConnectionPool(host=conf.host, port=conf.port)
+    name_db = Client(connection_pool=connection_pool, selected_db=conf.db)
+    name_db.setnx('db_name', conf.name).add_done_callback(check_result)
+
+    return dict(nodes=nodes,
+                name_db=name_db)
 
 
 def main(options):
@@ -66,7 +61,8 @@ def main(options):
     connman = ConnManager(pub_socket=msgman.pub_to_broker,
                           sub_socket=msgman.sub_to_broker,
                           locations_sub_socket=msgman.sub_to_locs)
-    root = Root(config, connman, msgman)
+    dbs = setup_dbs(config)
+    root = Root(config, connman, msgman, dbs)
     msgman.setup(connman, root)
     server = TCPServer()
     server.setup(Protocol, connman, root, options.max_conn)

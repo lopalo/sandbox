@@ -11,7 +11,7 @@ def main(options):
     client = BlockingClient()
     client.connect(host=options.host, port=options.port, seconds=wait)
     while True:
-        path = input('Path (leave empty to wait incoming message): ')
+        path = input('Path (leave empty to wait incoming message): ').strip()
         if not path:
             try:
                 print(client.recv(seconds=wait))
