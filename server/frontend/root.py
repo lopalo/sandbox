@@ -2,7 +2,7 @@ import logging
 import uuid
 import msgpack
 
-from sulaco.outer_server.message_manager import Root as ABCRoot
+from sulaco.outer_server.message_manager import LocationRoot
 from sulaco.utils.receiver import (
     message_receiver, message_router, LoopbackMixin,
     ProxyMixin, USER_SIGN, INTERNAL_USER_SIGN, INTERNAL_SIGN)
@@ -14,7 +14,7 @@ from frontend.user import User
 logger = logging.getLogger(__name__)
 
 
-class Root(ABCRoot, LoopbackMixin):
+class Root(LocationRoot, LoopbackMixin):
 
     def __init__(self, config, connman, msgman, dbs):
         super().__init__()

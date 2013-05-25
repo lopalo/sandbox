@@ -23,3 +23,8 @@ class User(Component):
     def save(self, db):
         yield db[self.uid].hset(self.uid, 'basic',
                     msgpack.dumps(self.as_plain()))
+
+    def json_view(self):
+        #TODO: without password and frontend_id
+        pass
+

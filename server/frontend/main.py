@@ -5,11 +5,11 @@ from tornado.ioloop import IOLoop
 from sulaco.outer_server.tcp_server import TCPServer, SimpleProtocol
 from sulaco.outer_server.connection_manager import (
     DistributedConnectionManager,
-    ConnectionHandler, LocationMixin)
-
+    ConnectionHandler, LocationConnectionManager)
 from sulaco.utils import Config, UTCFormatter
 from sulaco.utils.zmq import install
-from sulaco.outer_server.message_manager import MessageManager
+from sulaco.outer_server.message_manager import (
+    MessageManager, LocationMessageManager)
 from sulaco.redis import RedisNodes, Client, ConnectionPool
 
 from frontend.root import Root
@@ -21,7 +21,11 @@ class Protocol(ConnectionHandler, SimpleProtocol):
     pass
 
 
-class ConnManager(LocationMixin, DistributedConnectionManager):
+class ConnManager(LocationConnectionManager, DistributedConnectionManager):
+    pass
+
+
+class MsgManager(MessageManager, LocationMessageManager):
     pass
 
 
@@ -56,7 +60,7 @@ def main(options):
     logger.addHandler(handler)
 
     config = Config.load_yaml(options.config)
-    msgman = MessageManager(config)
+    msgman = MsgManager(config)
     msgman.connect()
     connman = ConnManager(pub_socket=msgman.pub_to_broker,
                           sub_socket=msgman.sub_to_broker,
