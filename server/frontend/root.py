@@ -42,11 +42,11 @@ class Root(LocationRoot, LoopbackMixin):
         self._connman.bind_connection_to_uid(conn, uid)
         yield from user.save(self._db)
         yield self._name_db.set(username, uid)
+        conn.s.user.basic_info(data=user.json_view())
 
     @message_receiver()
     def sign_in(self, username, password, conn, **kwargs):
         #TODO: remove showing of password from log
-        #TODO: write test for auth
         uid = yield self._name_db.get(username)
         if uid is None:
             conn.s.auth.error(text='unknown username')
@@ -63,7 +63,7 @@ class Root(LocationRoot, LoopbackMixin):
             yield from user.save(self._db)
         finally:
             self._lock.release(uid)
-        conn.s.user.basic_info(data=user.as_plain())
+        conn.s.user.basic_info(data=user.json_view())
 
     def location_added(self, loc_id):
         pass
