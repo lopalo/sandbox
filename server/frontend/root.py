@@ -65,6 +65,22 @@ class Root(LocationRoot, LoopbackMixin):
             self._lock.release(uid)
         conn.s.user.basic_info(data=user.json_view())
 
+    @message_router(USER_SIGN)
+    def user(self, next_step, conn, uid, **kwargs):
+        yield from self._lock.acquire(uid)
+        try:
+            user = yield from User.load(uid, self._db)
+            if self._frontend_id != user.frontend_id:
+                conn.close()
+                logger.info("User '%s' has wrong frontend ident", user.uid)
+                return
+            yield from next_step(user)
+            if user.need_save:
+                yield from user.save(self._db)
+        finally:
+            self._lock.release(uid)
+
+
     def location_added(self, loc_id):
         pass
 

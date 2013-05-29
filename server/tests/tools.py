@@ -9,6 +9,17 @@ from sulaco.tests.tools import BlockingClient
 from sulaco.utils import UTCFormatter, Config
 
 
+class Client(BlockingClient):
+    cmds_to_discard = ['user.basic_info']
+
+    def register(self, name, password='', discard_cmds=True, port=7010):
+        self.connect(port)
+        self.s.register(username=name, password=password)
+        if discard_cmds:
+            for cmd in self.cmds_to_discard:
+                self.recv(path_prefix=cmd)
+
+
 class FuncTestCase(testing.AsyncTestCase):
     debug = True # set DEBUG level of logging
 
@@ -76,6 +87,6 @@ class FuncTestCase(testing.AsyncTestCase):
             c.close()
 
     def client(self):
-        c = BlockingClient(ioloop=self.io_loop)
+        c = Client(ioloop=self.io_loop)
         self._clients.append(c)
         return c
