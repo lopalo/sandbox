@@ -1,2 +1,2 @@
-export PYTHONPATH=$PYTHONPATH:.:sulaco
+export PYTHONPATH=$PYTHONPATH:.
 nosetests tests

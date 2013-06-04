@@ -1,3 +1,6 @@
 [submodule "server/sulaco"]
 	path = server/sulaco
 	url = https://github.com/lopalo/sulaco.git
+[submodule "server/toredis"]
+	path = server/toredis
+	url = git@github.com:lopalo/toredis.git

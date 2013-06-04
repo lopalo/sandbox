@@ -10,11 +10,17 @@ from sulaco.utils import Config, UTCFormatter
 from sulaco.utils.zmq import install
 from sulaco.outer_server.message_manager import (
     MessageManager, LocationMessageManager)
-from sulaco.redis import RedisNodes, Client, ConnectionPool
+from toredis.client import ClientPool as BasicRedisPool
+from toredis.commands_future import RedisCommandsFutureMixin
+from toredis.nodes import RedisNodes
 
 from frontend.root import Root
 
 logger = logging.getLogger(__name__)
+
+
+class RedisPool(RedisCommandsFutureMixin, BasicRedisPool):
+    pass
 
 
 class Protocol(ConnectionHandler, SimpleProtocol):
@@ -41,8 +47,7 @@ def setup_dbs(config):
     nodes.check_nodes().add_done_callback(check_result)
 
     conf = config.outer_server.name_db
-    connection_pool = ConnectionPool(host=conf.host, port=conf.port)
-    name_db = Client(connection_pool=connection_pool, selected_db=conf.db)
+    name_db = RedisPool(host=conf.host, port=conf.port, db=conf.db)
     name_db.setnx('db_name', conf.name).add_done_callback(check_result)
 
     return dict(nodes=nodes,

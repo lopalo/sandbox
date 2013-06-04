@@ -2,7 +2,7 @@
 
 # run this script from server directory
 
-export PYTHONPATH=$PYTHONPATH:.:sulaco
+export PYTHONPATH=$PYTHONPATH:.
 
 python sulaco/sulaco/outer_server/message_broker.py -c configs/global.yaml &
 pid_1=$!

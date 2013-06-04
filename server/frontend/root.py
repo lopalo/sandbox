@@ -28,7 +28,6 @@ class Root(LocationRoot, LoopbackMixin):
 
     @message_receiver()
     def register(self, username, password, conn, **kwargs):
-        #TODO: remove showing of password from log
         assert username != 'db_name'
         exists = yield self._name_db.exists(username)
         if exists:
@@ -46,7 +45,6 @@ class Root(LocationRoot, LoopbackMixin):
 
     @message_receiver()
     def sign_in(self, username, password, conn, **kwargs):
-        #TODO: remove showing of password from log
         uid = yield self._name_db.get(username)
         if uid is None:
             conn.s.auth.error(text='unknown username')
@@ -81,7 +79,7 @@ class Root(LocationRoot, LoopbackMixin):
             self._lock.release(uid)
 
 
-    def location_added(self, loc_id):
+    def location_added(self, loc_id, data):
         pass
 
     def location_removed(self, loc_id):

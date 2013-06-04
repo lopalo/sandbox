@@ -4,7 +4,8 @@ import time
 
 from tornado import testing
 
-from sulaco.redis import Client as RedisClient
+from toredis.client import Client as BasicRedisClient
+from toredis.commands_future import RedisCommandsFutureMixin
 from sulaco.tests.tools import BlockingClient
 from sulaco.utils import UTCFormatter, Config
 
@@ -18,6 +19,9 @@ class Client(BlockingClient):
         if discard_cmds:
             for cmd in self.cmds_to_discard:
                 self.recv(path_prefix=cmd)
+
+class RedisClient(RedisCommandsFutureMixin, BasicRedisClient):
+    pass
 
 
 class FuncTestCase(testing.AsyncTestCase):
@@ -36,6 +40,7 @@ class FuncTestCase(testing.AsyncTestCase):
         self._clients = []
 
         self.redis = redis = RedisClient(io_loop=self.io_loop)
+        self.redis.connect()
         conf = Config.load_yaml(self.global_config)
         for n in conf.outer_server.db_nodes:
             redis.select(n['db'], callback=self.stop)
@@ -48,10 +53,10 @@ class FuncTestCase(testing.AsyncTestCase):
         self.wait()
 
         cmds = (['python',
-                 'sulaco/sulaco/outer_server/message_broker.py',
+                 'sulaco/outer_server/message_broker.py',
                  '-c', self.global_config],
                 ['python',
-                 'sulaco/sulaco/location_server/location_manager.py',
+                 'sulaco/location_server/location_manager.py',
                  '-c', self.global_config],
                 ['python',
                  'frontend/main.py',
