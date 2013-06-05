@@ -90,6 +90,7 @@ class FuncTestCase(testing.AsyncTestCase):
             s.terminate()
         for c in self._clients:
             c.close()
+        time.sleep(0.1)
 
     def client(self):
         c = Client(ioloop=self.io_loop)
