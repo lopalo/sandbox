@@ -5,7 +5,7 @@ import time
 from tornado import testing
 
 from sulaco.tests.tools import BlockingClient
-from sulaco.utils import UTCFormatter, Config
+from sulaco.utils import ColorUTCFormatter, Config
 
 from sulaco.utils.db import RedisClient
 
@@ -34,7 +34,7 @@ class FuncTestCase(testing.AsyncTestCase):
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG if self.debug else logging.INFO)
         handler = logging.StreamHandler()
-        handler.setFormatter(UTCFormatter())
+        handler.setFormatter(ColorUTCFormatter())
         logger.addHandler(handler)
 
         self._clients = []

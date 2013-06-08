@@ -6,7 +6,7 @@ from sulaco.outer_server.tcp_server import TCPServer, SimpleProtocol
 from sulaco.outer_server.connection_manager import (
     DistributedConnectionManager,
     ConnectionHandler, LocationConnectionManager)
-from sulaco.utils import Config, UTCFormatter
+from sulaco.utils import Config, ColorUTCFormatter
 from sulaco.utils.zmq import install
 from sulaco.outer_server.message_manager import (
     MessageManager, LocationMessageManager)
@@ -52,7 +52,7 @@ def main(options):
     logger.setLevel(logging.DEBUG if options.debug else logging.INFO)
     logger.propagate = False
     handler = logging.StreamHandler()
-    handler.setFormatter(UTCFormatter())
+    handler.setFormatter(ColorUTCFormatter())
     logger.addHandler(handler)
 
     config = Config.load_yaml(options.config)

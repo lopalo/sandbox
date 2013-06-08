@@ -2,7 +2,7 @@ import argparse
 import logging
 
 from tornado.ioloop import IOLoop
-from sulaco.utils import Config, UTCFormatter
+from sulaco.utils import Config, ColorUTCFormatter
 from sulaco.utils.zmq import install
 from sulaco.utils.db import RedisPool, check_db
 from sulaco.location_server.gateway import Gateway
@@ -20,7 +20,7 @@ def main(options):
     logger.setLevel(logging.DEBUG if options.debug else logging.INFO)
     logger.propagate = False
     handler = logging.StreamHandler()
-    handler.setFormatter(UTCFormatter())
+    handler.setFormatter(ColorUTCFormatter())
     logger.addHandler(handler)
 
     loc_config = Config.load_yaml(options.location_config)
