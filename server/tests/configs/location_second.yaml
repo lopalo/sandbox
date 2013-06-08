@@ -1,0 +1,8 @@
+ident: second_location
+pull_address: ipc://run/testing/second_location_pull
+pub_address: ipc://run/testing/second_location_pub
+db:
+  name: second_location #same as an ident
+  db: 26
+  host: localhost
+  port: 6379

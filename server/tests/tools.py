@@ -4,10 +4,10 @@ import time
 
 from tornado import testing
 
-from toredis.client import Client as BasicRedisClient
-from toredis.commands_future import RedisCommandsFutureMixin
 from sulaco.tests.tools import BlockingClient
 from sulaco.utils import UTCFormatter, Config
+
+from sulaco.utils.db import RedisClient
 
 
 class Client(BlockingClient):
@@ -20,14 +20,14 @@ class Client(BlockingClient):
             for cmd in self.cmds_to_discard:
                 self.recv(path_prefix=cmd)
 
-class RedisClient(RedisCommandsFutureMixin, BasicRedisClient):
-    pass
-
 
 class FuncTestCase(testing.AsyncTestCase):
     debug = True # set DEBUG level of logging
 
     global_config = 'tests/configs/global.yaml'
+    game_config = 'tests/configs/game.yaml'
+    main_loc_config = 'tests/configs/location_main.yaml'
+    second_loc_config = 'tests/configs/location_second.yaml'
 
     def setUp(self):
         super().setUp()
@@ -47,10 +47,16 @@ class FuncTestCase(testing.AsyncTestCase):
             self.wait()
             redis.flushdb(callback=self.stop)
             self.wait()
-        redis.select(conf.outer_server.name_db['db'], callback=self.stop)
+        redis.select(conf.outer_server.name_db.db, callback=self.stop)
         self.wait()
         redis.flushdb(callback=self.stop)
         self.wait()
+        for pth in (self.main_loc_config, self.second_loc_config):
+            lconf = Config.load_yaml(pth)
+            redis.select(lconf.db.db, callback=self.stop)
+            self.wait()
+            redis.flushdb(callback=self.stop)
+            self.wait()
 
         cmds = (['python',
                  'sulaco/outer_server/message_broker.py',
@@ -62,25 +68,23 @@ class FuncTestCase(testing.AsyncTestCase):
                  'frontend/main.py',
                  '-p', '7010',
                  '-c', self.global_config,
+                 '-gc', self.game_config,
                  '--debug'],
                 ['python',
                  'frontend/main.py',
                  '-p', '7011',
                  '-c', self.global_config,
+                 '-gc', self.game_config,
                  '--debug'],
                 ['python',
                  'location/main.py',
-                 '-pub', 'ipc://run/testing/loc_1_pub',
-                 '-pull', 'ipc://run/testing/loc_1_pull',
-                 '-ident', 'loc_1',
                  '-c', self.global_config,
+                 '-lc', self.main_loc_config,
                  '--debug'],
                 ['python',
                  'location/main.py',
-                 '-pub', 'ipc://run/testing/loc_2_pub',
-                 '-pull', 'ipc://run/testing/loc_2_pull',
-                 '-ident', 'loc_2',
                  '-c', self.global_config,
+                 '-lc', self.second_loc_config,
                  '--debug'])
         self._services = [subprocess.Popen(cmd) for cmd in cmds]
         time.sleep(0.7)

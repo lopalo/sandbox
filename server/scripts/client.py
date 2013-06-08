@@ -1,10 +1,8 @@
 import argparse
 from sulaco.tests.tools import BlockingClient, TimeoutError
 
-def get_pairs(items):
-    i = iter(items)
-    while True:
-        yield next(i), next(i)
+from sulaco.utils import get_pairs
+
 
 def main(options):
     wait = options.wait

@@ -10,6 +10,7 @@ class User(Component):
     frontend_id = Field()
     uid = Field()
     name = Field()
+    location = Field()
     password_hash = Field()
 
     _need_save = False

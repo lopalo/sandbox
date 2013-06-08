@@ -1,0 +1,8 @@
+ident: main_location
+pull_address: ipc://run/main_location_pull
+pub_address: ipc://run/main_location_pub
+db:
+  name: main_location #same as an ident
+  db: 15
+  host: localhost
+  port: 6379
