@@ -3,12 +3,11 @@ import logging
 from sulaco.utils.receiver import message_receiver, INTERNAL_SIGN
 from sulaco.utils import get_pairs
 
-from location import UserId
+from location.db import UserId, user_idents_key
 
 
 logger = logging.getLogger(__name__)
 
-user_idents_key = 'user_idents'
 
 class Root(object):
     #TODO: try to use only atomic db operations
@@ -22,9 +21,7 @@ class Root(object):
 
     def get_current_state(self):
         cli = self._db.get_client()
-        #TODO: use redis scripting
-        uids = yield cli.smembers(user_idents_key)
-        ret = yield [cli.hgetall(uid) for uid in uids] # pipelining
+        ret = yield cli.get_all_users()
         users = [dict(get_pairs(i)) for i in ret]
         return dict(ident=self._ident,
                     users=users)
@@ -38,9 +35,11 @@ class Root(object):
             pos = (0, 0)
         user['pos'] = pos
         cli = self._db.get_client()
-        bulk = [cli.hmset(UserId(uid), user),
-                cli.sadd(user_idents_key, UserId(uid))]
-        yield bulk
+        # pipelining
+        yield [cli.multi(),
+               cli.hmset(UserId(uid), user),
+               cli.sadd(user_idents_key, UserId(uid)),
+               cli.execute()]
         state = yield from self.get_current_state()
         self._gateway.prs(uid).init(state=state)
         self._gateway.pubs.user_connected(user=user)
@@ -48,7 +47,10 @@ class Root(object):
     @message_receiver(INTERNAL_SIGN)
     def move_to(self, uid, target_location):
         cli = self._db.get_client()
-        yield [cli.delete(UserId(uid)), cli.srem(user_idents_key, UserId(uid))]
+        yield [cli.multi(),
+               cli.delete(UserId(uid)),
+               cli.srem(user_idents_key, UserId(uid)),
+               cli.execute()]
         self._gateway.prs(uid).enter(location=target_location)
         self._gateway.pubs.user_disconnected(uid=uid)
 

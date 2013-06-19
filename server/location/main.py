@@ -2,15 +2,29 @@ import argparse
 import logging
 
 from tornado.ioloop import IOLoop
+from tornado.gen import coroutine
 from sulaco.utils import Config, ColorUTCFormatter
 from sulaco.utils.zmq import install
-from sulaco.utils.db import RedisPool, check_db
+from sulaco.utils.db import check_db
 from sulaco.location_server.gateway import Gateway
 
 from location.root import Root
+from location.db import LocationRedisPool
 
 
 logger = logging.getLogger(__name__)
+
+
+@coroutine
+def prepare_db(loc_config, ioloop):
+    try:
+        dbc = loc_config.db
+        db = LocationRedisPool(host=dbc.host, port=dbc.port, db=dbc.db)
+        yield from check_db(dbc.name, db)
+        yield from db.get_client().load_scripts()
+    finally:
+        ioloop.stop()
+    return db
 
 
 def main(options):
@@ -24,10 +38,12 @@ def main(options):
     logger.addHandler(handler)
 
     loc_config = Config.load_yaml(options.location_config)
-    dbc = loc_config.db
-    db = RedisPool(host=dbc.host, port=dbc.port, db=dbc.db)
-    check_db(dbc.name, db, IOLoop.instance())
 
+    ioloop = IOLoop.instance()
+    db_fut = prepare_db(loc_config, ioloop)
+    ioloop.start()
+
+    db = db_fut.result()
     config = Config.load_yaml(options.config)
     gateway = Gateway(config, loc_config.ident)
     root = Root(gateway, loc_config, db)
@@ -36,7 +52,7 @@ def main(options):
                                 loc_config.pull_address)
     if not connected:
         return
-    gateway.start()
+    gateway.start(ioloop) # runs ioloop again
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

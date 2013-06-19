@@ -2,6 +2,7 @@ import argparse
 import logging
 
 from tornado.ioloop import IOLoop
+from tornado.gen import coroutine
 from sulaco.outer_server.tcp_server import TCPServer, SimpleProtocol
 from sulaco.outer_server.connection_manager import (
     DistributedConnectionManager,
@@ -30,19 +31,21 @@ class MsgManager(MessageManager, LocationMessageManager):
     pass
 
 
-def setup_dbs(config):
-    ioloop = IOLoop.instance()
+@coroutine
+def prepare_dbs(config, on_ready):
+    try:
+        nodes = RedisNodes(nodes=config.outer_server.db_nodes)
+        for info, cli in nodes.nodes:
+            yield from check_db(info['name'], cli)
 
-    nodes = RedisNodes(nodes=config.outer_server.db_nodes)
-    for info, cli in nodes.nodes:
-        check_db(info['name'], cli, ioloop)
-
-    conf = config.outer_server.name_db
-    name_db = RedisPool(host=conf.host, port=conf.port, db=conf.db)
-    check_db(conf.name, name_db, ioloop)
-
-    return dict(nodes=nodes,
-                name_db=name_db)
+        conf = config.outer_server.name_db
+        name_db = RedisPool(host=conf.host, port=conf.port, db=conf.db)
+        yield from check_db(conf.name, name_db)
+    except Exception:
+        IOLoop.instance().stop()
+        raise
+    else:
+        on_ready(nodes=nodes, name_db=name_db)
 
 
 def main(options):
@@ -56,18 +59,21 @@ def main(options):
     logger.addHandler(handler)
 
     config = Config.load_yaml(options.config)
-    msgman = MsgManager(config)
-    msgman.connect()
-    connman = ConnManager(pub_socket=msgman.pub_to_broker,
-                          sub_socket=msgman.sub_to_broker,
-                          locations_sub_socket=msgman.sub_to_locs)
-    dbs = setup_dbs(config)
-    game_config = Config.load_yaml(options.game_config)
-    root = Root(config, game_config, connman, msgman, dbs)
-    msgman.setup(connman, root)
-    server = TCPServer()
-    server.setup(Protocol, connman, root, options.max_conn)
-    server.listen(options.port)
+
+    def on_db_ready(**dbs):
+        msgman = MsgManager(config)
+        msgman.connect()
+        connman = ConnManager(pub_socket=msgman.pub_to_broker,
+                              sub_socket=msgman.sub_to_broker,
+                              locations_sub_socket=msgman.sub_to_locs)
+        game_config = Config.load_yaml(options.game_config)
+        root = Root(config, game_config, connman, msgman, dbs)
+        msgman.setup(connman, root)
+        server = TCPServer()
+        server.setup(Protocol, connman, root, options.max_conn)
+        server.listen(options.port)
+
+    prepare_dbs(config, on_db_ready)
     IOLoop.instance().start()
 
 
