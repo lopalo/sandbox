@@ -22,6 +22,8 @@ class Client(BlockingClient):
 
 
 class FuncTestCase(testing.AsyncTestCase):
+    #TODO: tool for reading of logs
+
     debug = True # set DEBUG level of logging
 
     global_config = 'tests/configs/global.yaml'

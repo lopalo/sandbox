@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class Root(LocationRoot, LoopbackMixin):
+    #TODO: more info logs
 
     def __init__(self, config, game_config, connman, msgman, dbs):
         super().__init__()
@@ -45,10 +46,13 @@ class Root(LocationRoot, LoopbackMixin):
                     location=loc_id,
                     password_hash=User.generate_password_hash(password),
                     frontend_id=self._frontend_id)
+        user.setup(db=self._db,
+                   connman=self._connman,
+                   msgman=self._msgman)
         self._connman.bind_connection_to_uid(conn, uid)
-        yield from user.save(self._db)
+        yield from user.save()
         yield self._name_db.set(username, uid)
-        conn.s.user.basic_info(data=user.json_view())
+        conn.s.user.basic_info(data=user.client_view())
         self.lbs.location.enter(uid=uid)
 
     @message_receiver()
@@ -61,31 +65,34 @@ class Root(LocationRoot, LoopbackMixin):
         yield from self._lock.acquire(uid)
         try:
             user = yield from User.load(uid, self._db)
+            user.setup(db=self._db,
+                       connman=self._connman,
+                       msgman=self._msgman)
             if user.password_hash != User.generate_password_hash(password):
                 conn.s.auth.error(text='wrong username or password')
                 return
             user.frontend_id = self._frontend_id
             self._connman.bind_connection_to_uid(conn, uid)
-            yield from user.save(self._db)
+            yield from user.save()
         finally:
             self._lock.release(uid)
-        conn.s.user.basic_info(data=user.json_view())
+        conn.s.user.basic_info(data=user.client_view())
         self.lbs.location.enter(uid=uid)
 
     @message_router(USER_SIGN)
     def user(self, next_step, uid, **kwargs):
+        conn = self._connman.get_connection(uid)
         yield from self._lock.acquire(uid)
         try:
             user = yield from User.load(uid, self._db)
-            if self._frontend_id != user.frontend_id:
-                conn = self._connman.get_connection(uid)
-                if conn is not None:
-                    conn.close()
-                logger.info("User '%s' has wrong frontend ident", user.uid)
+            user.setup(db=self._db,
+                       connman=self._connman,
+                       msgman=self._msgman)
+            user.snapshot()
+            if not user.check_frontend(self._frontend_id):
                 return
             yield from next_step(user)
-            if user.need_save:
-                yield from user.save(self._db)
+            yield from user.finalize()
         finally:
             self._lock.release(uid)
 
@@ -106,12 +113,13 @@ class Root(LocationRoot, LoopbackMixin):
         yield from self._lock.acquire(uid)
         try:
             user = yield from User.load(uid, self._db)
-            if self._frontend_id != user.frontend_id:
-                conn = self._connman.get_connection(uid)
-                if conn is not None:
-                    conn.close()
-                logger.info("User '%s' has wrong frontend ident", user.uid)
+            user.setup(db=self._db,
+                       connman=self._connman,
+                       msgman=self._msgman)
+            user.snapshot()
+            if not user.check_frontend(self._frontend_id):
                 return
+
             if sign == INTERNAL_SIGN:
                 loc_id = location or user.location
             else:
@@ -124,14 +132,14 @@ class Root(LocationRoot, LoopbackMixin):
                 return
 
             socket = self._msgman.loc_input_sockets[loc_id]
+            socket = user.wrap_loc_socket(socket)
             location = Location(ident=loc_id,
                                 user=user,
                                 loc_input=socket,
                                 connman=self._connman,
                                 config=self._config)
             yield from next_step(location)
-            if user.need_save:
-                yield from user.save(self._db)
+            yield from user.finalize()
         finally:
             self._lock.release(uid)
 
