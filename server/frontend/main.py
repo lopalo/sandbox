@@ -8,7 +8,7 @@ from sulaco.outer_server.connection_manager import (
     DistributedConnectionManager,
     ConnectionHandler, LocationConnectionManager)
 from sulaco.utils import Config, ColorUTCFormatter
-from sulaco.utils.zmq import install
+from zmq.eventloop.ioloop import install
 from sulaco.outer_server.message_manager import (
     MessageManager, LocationMessageManager)
 from sulaco.utils.db import RedisPool, RedisNodes, check_db

@@ -121,8 +121,8 @@ class FuncTestCase(testing.AsyncTestCase):
         Thread(target=_read_func).start()
 
     def wait_log_message(self, pattern, seconds=5):
-        start = time.time()
-        while time.time() - start < seconds:
+        start = self.io_loop.time()
+        while self.io_loop.time() - start < seconds:
             while self._log_buffer:
                 line = self._log_buffer.popleft()
                 match = re.search(pattern, line)
@@ -139,9 +139,9 @@ class FuncTestCase(testing.AsyncTestCase):
         self._stop_log_thread = True
         for s in self._services:
             s.terminate()
+            s.wait()
         for c in self._clients:
             c.close()
-        time.sleep(0.1)
 
     def client(self):
         c = Client(ioloop=self.io_loop)

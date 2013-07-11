@@ -1,0 +1,6 @@
+PyYAML==3.10
+hiredis==0.1.1
+msgpack-python==0.3.0
+pyzmq==13.1.0
+steward==0.0.4
+tornado==3.0.1

@@ -4,7 +4,7 @@ import logging
 from tornado.ioloop import IOLoop
 from tornado.gen import coroutine
 from sulaco.utils import Config, ColorUTCFormatter
-from sulaco.utils.zmq import install
+from zmq.eventloop.ioloop import install
 from sulaco.utils.db import check_db
 from sulaco.location_server.gateway import Gateway
 
