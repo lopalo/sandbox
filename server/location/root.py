@@ -54,5 +54,9 @@ class Root(object):
         self._gateway.prs(uid).enter(location=target_location)
         self._gateway.pubs.user_disconnected(uid=uid)
 
+    @message_receiver(INTERNAL_SIGN)
+    def update_user(self, uid, user):
+        #TODO: update only if user exists (SET with XX flag) update and notify all users
+        pass
 
 

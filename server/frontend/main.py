@@ -14,6 +14,7 @@ from sulaco.outer_server.message_manager import (
 from sulaco.utils.db import RedisPool, RedisNodes, check_db
 
 from frontend.root import Root
+from utils.debugging import set_debug_mode
 
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,8 @@ def main(options):
         server.listen(options.port)
 
     prepare_dbs(config, on_db_ready)
+    if options.debug:
+        set_debug_mode()
     IOLoop.instance().start()
 
 

@@ -1,10 +1,15 @@
 import subprocess
 import logging
 import time
+import os
+import fcntl
+import re
 
+from threading import Thread
+from collections import deque
 from tornado import testing
 
-from sulaco.tests.tools import BlockingClient
+from sulaco.tests.tools import BlockingClient, TimeoutError
 from sulaco.utils import ColorUTCFormatter, Config
 
 from sulaco.utils.db import RedisClient
@@ -22,8 +27,6 @@ class Client(BlockingClient):
 
 
 class FuncTestCase(testing.AsyncTestCase):
-    #TODO: tool for reading of logs
-
     debug = True # set DEBUG level of logging
 
     global_config = 'tests/configs/global.yaml'
@@ -88,10 +91,52 @@ class FuncTestCase(testing.AsyncTestCase):
                  '-c', self.global_config,
                  '-lc', self.second_loc_config,
                  '--debug'])
-        self._services = [subprocess.Popen(cmd) for cmd in cmds]
+        self._services = [subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT) for cmd in cmds]
+        self._start_log_thread()
         time.sleep(0.7)
 
+    def _start_log_thread(self):
+        #TODO: change to zmq logging
+        self._stop_log_thread = False
+        self._log_buffer = deque()
+        for serv in self._services:
+            fcntl.fcntl(serv.stdout.fileno(), fcntl.F_SETFL, os.O_NONBLOCK)
+        def _read_func():
+            while not self._stop_log_thread:
+                for serv in self._services:
+                    try:
+                        while True:
+                            line = serv.stdout.readline()
+                            if line:
+                                line = line[:-1].decode('utf-8')
+                                print(line)
+                                self._log_buffer.append(line)
+                            else:
+                                break
+                    except IOError:
+                        pass
+        Thread(target=_read_func).start()
+
+    def wait_log_message(self, pattern, seconds=5):
+        start = time.time()
+        while time.time() - start < seconds:
+            while self._log_buffer:
+                line = self._log_buffer.popleft()
+                match = re.search(pattern, line)
+                if match is not None:
+                    return match
+        msg = "Pattern '{}' is not found in {} seconds".format(pattern,
+                                                               seconds)
+        raise TimeoutError(msg)
+
+    def flush_log_buffer(self):
+        self._log_buffer = deque()
+
     def tearDown(self):
+        self._stop_log_thread = True
         for s in self._services:
             s.terminate()
         for c in self._clients:

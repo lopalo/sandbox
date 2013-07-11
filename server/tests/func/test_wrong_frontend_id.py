@@ -1,6 +1,6 @@
 from tests.tools import FuncTestCase
 
-from sulaco.tests.tools import ConnectionClosed
+from sulaco.tests.tools import StreamClosedError
 
 
 class TestWrongFrontendId(FuncTestCase):
@@ -14,8 +14,8 @@ class TestWrongFrontendId(FuncTestCase):
         c2.connect(7011)
         c2.s.sign_in(username='user', password='')
         c2.recv(path_prefix='user.basic_info')
-        c1.s.user.get_basic_info()
-        with self.assertRaises(ConnectionClosed):
+        with self.assertRaises(StreamClosedError):
+            c1.s.user.get_basic_info()
             c1.recv(1, path_prefix='user.basic_info')
         c2.flush()
         c2.s.user.get_basic_info()

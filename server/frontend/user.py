@@ -8,6 +8,8 @@ from steward import Component, Field
 from sulaco.utils import Sender
 from sulaco.utils.receiver import message_receiver, USER_SIGN
 
+from utils.debugging import debug_func
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,21 +44,20 @@ class User(Component):
         self._loc_view_copy = deepcopy(self.location_view())
 
     def finalize(self):
-        #TODO: test
         if self._copy == self.as_plain():
             return
         yield from self.save()
         if self._cli_view_copy != self.client_view() and self.conn is not None:
-            conn.s.user.basic_info(data=self.client_view())
+            self.conn.s.user.basic_info(data=self.client_view())
         if self._loc_view_copy != self.location_view() \
                         and self.loc_conn is not None:
-            # TODO: update user in location if it has entered
-            pass
+            self.loc_conn.s.update_user(user=self.location_view())
         self.snapshot()
 
     def save(self):
         yield self._db[self.uid].hset(self.uid, 'basic',
                         msgpack.dumps(self.as_plain()))
+        logger.debug("User %s saved", self.uid)
 
     def check_frontend(self, frontend_id):
         if frontend_id == self.frontend_id:
@@ -101,5 +102,10 @@ class User(Component):
     def get_basic_info(self, conn, **kwargs):
         conn.s.user.basic_info(data=self.client_view())
 
+    @debug_func
+    @message_receiver(USER_SIGN)
+    def change_field(self, name, value, **kwargs):
+        assert hasattr(self, name), name
+        setattr(self, name, value)
 
 

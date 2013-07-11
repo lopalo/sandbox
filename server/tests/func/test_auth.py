@@ -16,8 +16,8 @@ class TestAuth(FuncTestCase):
         self.assertEqual('mega_user', ret['users'][0]['name'])
         ret = c1.recv(path_prefix='location.user_connected')
         self.assertEqual({'name': 'mega_user',
-                           'uid': ANY,
-                           'pos': [0, 0]}, ret['kwargs']['user'])
+                          'uid': ANY,
+                          'pos': [0, 0]}, ret['kwargs']['user'])
         c1.close()
 
         # sign in
@@ -40,7 +40,7 @@ class TestAuth(FuncTestCase):
         self.assertEqual('mega_user', ret['users'][0]['name'])
         ret = c2.recv(path_prefix='location.user_connected')
         self.assertEqual({'name': 'mega_user',
-                           'uid': ANY,
-                           'pos': [0, 0]}, ret['kwargs']['user'])
+                          'uid': ANY,
+                          'pos': [0, 0]}, ret['kwargs']['user'])
 
 

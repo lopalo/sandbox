@@ -1,2 +1,2 @@
 export PYTHONPATH=$PYTHONPATH:.
-nosetests tests
+nosetests -s tests
