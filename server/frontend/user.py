@@ -43,14 +43,15 @@ class User(Component):
         self._cli_view_copy = deepcopy(self.client_view())
         self._loc_view_copy = deepcopy(self.location_view())
 
-    def finalize(self):
+    def finalize(self, *, update_client=True, update_location=True):
         if self._copy == self.as_plain():
             return
         yield from self.save()
-        if self._cli_view_copy != self.client_view() and self.conn is not None:
+        if update_client and self.conn is not None \
+                and self._cli_view_copy != self.client_view():
             self.conn.s.user.basic_info(data=self.client_view())
-        if self._loc_view_copy != self.location_view() \
-                        and self.loc_conn is not None:
+        if update_location and self.loc_conn is not None \
+                and self._loc_view_copy != self.location_view():
             self.loc_conn.s.update_user(user=self.location_view())
         self.snapshot()
 

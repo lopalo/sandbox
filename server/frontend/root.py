@@ -106,10 +106,12 @@ class Root(LocationRoot, LoopbackMixin):
     def start_locations(self):
         st_locs = set(self._game_config.user.start_locations)
         avail_locs = set(self._locations)
-        return list(st_locs | avail_locs)
+        return list(st_locs & avail_locs)
 
     @message_router(INTERNAL_USER_SIGN, pass_sign=True)
-    def location(self, next_step, sign, uid, location=None, **kwargs):
+    def location(self, next_step, sign, uid, location=None,
+                                update_in_loc=True, **kwargs):
+        #TODO: use 'update_in_loc = False' in messages from locaton
         yield from self._lock.acquire(uid)
         try:
             user = yield from User.load(uid, self._db)
@@ -139,7 +141,7 @@ class Root(LocationRoot, LoopbackMixin):
                                 connman=self._connman,
                                 config=self._config)
             yield from next_step(location)
-            yield from user.finalize()
+            yield from user.finalize(update_location=update_in_loc)
         finally:
             self._lock.release(uid)
 

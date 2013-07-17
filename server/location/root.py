@@ -1,5 +1,6 @@
 import logging
 
+from itertools import chain
 from sulaco.utils.receiver import message_receiver, INTERNAL_SIGN
 from sulaco.utils import get_pairs
 
@@ -10,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class Root(object):
-    #TODO: try to use only atomic db operations
-
+    ###
+    # WARNING: try to use only atomic db operations, otherwise use redis lock
+    ###
 
     def __init__(self, gateway, location_config, db):
         self._gateway = gateway
@@ -20,8 +22,9 @@ class Root(object):
         self._db = db
 
     def get_current_state(self):
-        cli = self._db.get_client()
-        ret = yield cli.get_all_users()
+        ret = yield self._db.get_all_users()
+        #TODO: unpack users correctly (now returns byte strings)
+        # and check in test
         users = [dict(get_pairs(i)) for i in ret]
         return dict(ident=self._ident,
                     users=users)
@@ -37,7 +40,7 @@ class Root(object):
         cli = self._db.get_client()
         # pipelining
         yield [cli.multi(),
-               cli.hmset(UserId(uid), user),
+               cli.hmset(UserId(uid), user), #TODO: pack user correctly
                cli.sadd(user_idents_key, UserId(uid)),
                cli.execute()]
         state = yield from self.get_current_state()
@@ -56,7 +59,10 @@ class Root(object):
 
     @message_receiver(INTERNAL_SIGN)
     def update_user(self, uid, user):
-        #TODO: update only if user exists (SET with XX flag) update and notify all users
-        pass
+        ret = yield self._db.update_hash_exists(UserId(uid),
+                               args=list(chain(*user.items())))
+        if ret == 1:
+            self._gateway.pubs.user_updated(user=user)
+
 
 

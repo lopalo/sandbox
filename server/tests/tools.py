@@ -28,11 +28,12 @@ class Client(BlockingClient):
 
 class FuncTestCase(testing.AsyncTestCase):
     debug = True # set DEBUG level of logging
+    read_output = False # read in separate thread output of child processes
 
-    global_config = 'tests/configs/global.yaml'
-    game_config = 'tests/configs/game.yaml'
-    main_loc_config = 'tests/configs/location_main.yaml'
-    second_loc_config = 'tests/configs/location_second.yaml'
+    global_config_path = 'tests/configs/global.yaml'
+    game_config_path = 'tests/configs/game.yaml'
+    main_loc_config_path = 'tests/configs/location_main.yaml'
+    second_loc_config_path = 'tests/configs/location_second.yaml'
 
     def setUp(self):
         super().setUp()
@@ -44,62 +45,67 @@ class FuncTestCase(testing.AsyncTestCase):
 
         self._clients = []
 
-        self.redis = redis = RedisClient(io_loop=self.io_loop)
-        self.redis.connect()
-        conf = Config.load_yaml(self.global_config)
+        self._redis_cli = RedisClient(io_loop=self.io_loop)
+        self._redis_cli.connect()
+        redis = self.redis
+        conf = self.global_config = Config.load_yaml(self.global_config_path)
+        self.main_loc_config = Config.load_yaml(self.main_loc_config_path)
+        self.second_loc_config = Config.load_yaml(self.second_loc_config_path)
         for n in conf.outer_server.db_nodes:
-            redis.select(n['db'], callback=self.stop)
-            self.wait()
-            redis.flushdb(callback=self.stop)
-            self.wait()
-        redis.select(conf.outer_server.name_db.db, callback=self.stop)
-        self.wait()
-        redis.flushdb(callback=self.stop)
-        self.wait()
-        for pth in (self.main_loc_config, self.second_loc_config):
-            lconf = Config.load_yaml(pth)
-            redis.select(lconf.db.db, callback=self.stop)
-            self.wait()
-            redis.flushdb(callback=self.stop)
-            self.wait()
+            redis('select', n['db'])
+            redis('flushdb')
+        redis('select', conf.outer_server.name_db.db)
+        redis('flushdb')
+        redis('select', self.main_loc_config.db.db)
+        redis('flushdb')
+        redis('select', self.second_loc_config.db.db)
+        redis('flushdb')
 
         cmds = (['python',
                  'sulaco/outer_server/message_broker.py',
-                 '-c', self.global_config],
+                 '-c', self.global_config_path],
                 ['python',
                  'sulaco/location_server/location_manager.py',
-                 '-c', self.global_config],
+                 '-c', self.global_config_path],
                 ['python',
                  'frontend/main.py',
                  '-p', '7010',
-                 '-c', self.global_config,
-                 '-gc', self.game_config,
+                 '-c', self.global_config_path,
+                 '-gc', self.game_config_path,
                  '--debug'],
                 ['python',
                  'frontend/main.py',
                  '-p', '7011',
-                 '-c', self.global_config,
-                 '-gc', self.game_config,
+                 '-c', self.global_config_path,
+                 '-gc', self.game_config_path,
                  '--debug'],
                 ['python',
                  'location/main.py',
-                 '-c', self.global_config,
-                 '-lc', self.main_loc_config,
+                 '-c', self.global_config_path,
+                 '-lc', self.main_loc_config_path,
                  '--debug'],
                 ['python',
                  'location/main.py',
-                 '-c', self.global_config,
-                 '-lc', self.second_loc_config,
+                 '-c', self.global_config_path,
+                 '-lc', self.second_loc_config_path,
                  '--debug'])
+        if self.read_output:
+            stdout = subprocess.PIPE
+            stderr = subprocess.STDOUT
+        else:
+            stdout = None
+            stderr = None
         self._services = [subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT) for cmd in cmds]
+            stdout=stdout,
+            stderr=stderr) for cmd in cmds]
         self._start_log_thread()
         time.sleep(0.7)
 
     def _start_log_thread(self):
         #TODO: change to zmq logging
+        if not self.read_output:
+            return
         self._stop_log_thread = False
         self._log_buffer = deque()
         for serv in self._services:
@@ -136,6 +142,7 @@ class FuncTestCase(testing.AsyncTestCase):
         self._log_buffer = deque()
 
     def tearDown(self):
+        #TODO: speed up
         self._stop_log_thread = True
         for s in self._services:
             s.terminate()
@@ -147,3 +154,15 @@ class FuncTestCase(testing.AsyncTestCase):
         c = Client(ioloop=self.io_loop)
         self._clients.append(c)
         return c
+
+    def redis(self, cmd, *args):
+        getattr(self._redis_cli, cmd.lower())(*args, callback=self.stop)
+        return self.wait()
+
+    def find_in_shards(self, *args, cmd='get'):
+        for n in self.global_config.outer_server.db_nodes:
+            self.redis('select', n['db'])
+            ret = self.redis(cmd, *args)
+            if ret is not None:
+                return ret
+

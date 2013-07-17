@@ -1,5 +1,6 @@
 import argparse
 import logging
+import random
 
 from tornado.ioloop import IOLoop
 from tornado.gen import coroutine
@@ -21,7 +22,7 @@ def prepare_db(loc_config, ioloop):
         dbc = loc_config.db
         db = LocationRedisPool(host=dbc.host, port=dbc.port, db=dbc.db)
         yield from check_db(dbc.name, db)
-        yield from db.get_client().load_scripts()
+        yield from db.load_scripts()
     finally:
         ioloop.stop()
     return db
@@ -38,6 +39,7 @@ def main(options):
     logger.addHandler(handler)
 
     loc_config = Config.load_yaml(options.location_config)
+    random.seed(0)
 
     ioloop = IOLoop.instance()
     db_fut = prepare_db(loc_config, ioloop)

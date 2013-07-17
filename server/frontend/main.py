@@ -1,5 +1,6 @@
 import argparse
 import logging
+import random
 
 from tornado.ioloop import IOLoop
 from tornado.gen import coroutine
@@ -60,6 +61,7 @@ def main(options):
     logger.addHandler(handler)
 
     config = Config.load_yaml(options.config)
+    random.seed(0)
 
     def on_db_ready(**dbs):
         msgman = MsgManager(config)
