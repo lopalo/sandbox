@@ -110,10 +110,11 @@ class Root(LocationRoot, LoopbackMixin):
 
     @message_router(INTERNAL_USER_SIGN, pass_sign=True)
     def location(self, next_step, sign, uid, location=None,
-                                update_in_loc=True, **kwargs):
-        #TODO: use 'update_in_loc = False' in messages from locaton
+                                _update_in_loc=True, **kwargs):
         yield from self._lock.acquire(uid)
+        #TODO: use context manager
         try:
+            #TODO: use Location.step_is_proxy(next_step) to decide to load user
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
                        connman=self._connman,
@@ -141,7 +142,7 @@ class Root(LocationRoot, LoopbackMixin):
                                 connman=self._connman,
                                 config=self._config)
             yield from next_step(location)
-            yield from user.finalize(update_location=update_in_loc)
+            yield from user.finalize(update_location=_update_in_loc)
         finally:
             self._lock.release(uid)
 

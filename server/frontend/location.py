@@ -29,12 +29,19 @@ class Location(ProxyMixin):
         connman.add_user_to_location(self._ident, user.uid)
         loc_conn.s.enter(user=user.location_view(), prev_loc=prev_loc)
 
+    @message_receiver(INTERNAL_SIGN)
+    def update_field(self, field, value, **kwargs):
+        #TODO: use difference to avoid of state rewriting
+        setattr(self._user, field, value)
+
     def proxy_method(self, path, sign, kwargs):
         uid = kwargs.pop('uid')
         kwargs.pop('location', None)
         kwargs.pop('conn', None)
+        kwargs.pop('_update_in_loc', None)
         if sign == USER_SIGN:
-            self.send(dict(path='.'.join(path), kwargs=kwargs))
+            self._loc_input.send(dict(path='.'.join(path), kwargs=kwargs),
+                                                            sign=USER_SIGN)
         elif sign == INTERNAL_SIGN:
             conn = self._connman.get_connection(uid)
             if conn is None:

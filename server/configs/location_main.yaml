@@ -6,3 +6,9 @@ db:
   db: 15
   host: localhost
   port: 6379
+work_handlers:
+  path: configs/work_handlers.yaml
+  tick_processors: 10
+  works_per_step: 10
+
+  

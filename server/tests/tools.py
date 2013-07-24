@@ -18,12 +18,16 @@ from sulaco.utils.db import RedisClient
 class Client(BlockingClient):
     cmds_to_discard = ['user.basic_info']
 
+    uid = None
+
     def register(self, name, password='', discard_cmds=True, port=7010):
         self.connect(port)
         self.s.register(username=name, password=password)
         if discard_cmds:
             for cmd in self.cmds_to_discard:
-                self.recv(path_prefix=cmd)
+                ret = self.recv(path_prefix=cmd)
+                if cmd == 'user.basic_info':
+                    self.uid = ret['kwargs']['data']['uid']
 
 
 class FuncTestCase(testing.AsyncTestCase):

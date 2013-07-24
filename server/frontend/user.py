@@ -6,7 +6,7 @@ from copy import deepcopy
 from steward import Component, Field
 
 from sulaco.utils import Sender
-from sulaco.utils.receiver import message_receiver, USER_SIGN
+from sulaco.utils.receiver import message_receiver, USER_SIGN, INTERNAL_SIGN
 
 from utils.debugging import debug_func
 
@@ -21,8 +21,9 @@ class LocInputSocket(object):
         self._uid = uid
         self.s = Sender(self.send)
 
-    def send(self, msg):
+    def send(self, msg, sign=INTERNAL_SIGN):
         msg['kwargs']['uid'] = self._uid
+        msg['sign'] = sign
         self._sock.send(msgpack.dumps(msg))
 
 
@@ -32,6 +33,8 @@ class User(Component):
     name = Field()
     location = Field()
     password_hash = Field()
+
+    stones = Field(default=0)
 
     def setup(self, *, db, connman, msgman):
         self._db = db
@@ -79,11 +82,13 @@ class User(Component):
 
     def client_view(self):
         return {'uid': self.uid,
-                'name': self.name}
+                'name': self.name,
+                'stones': self.stones}
 
     def location_view(self):
         return {'uid': self.uid,
-                'name': self.name}
+                'name': self.name,
+                'stones': self.stones}
 
     @property
     def conn(self):

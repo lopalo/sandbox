@@ -1,0 +1,5 @@
+incr_stones:
+  type: IncrFieldHandler
+  transition: 'lineral'
+  ticks: 5 
+  field: stones
