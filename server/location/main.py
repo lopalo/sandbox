@@ -28,8 +28,8 @@ def prepare_db(loc_config, ioloop):
         yield from check_db(dbc.name, db)
         yield from db.load_scripts()
         # recreate active work queue
-        yield db.delete(QUEUE_WORK_IDENTS_KEY)
-        yield db.zunionstore(QUEUE_WORK_IDENTS_KEY, WORK_IDENTS_KEY)
+        yield from db.delete(QUEUE_WORK_IDENTS_KEY)
+        yield from db.zunionstore(QUEUE_WORK_IDENTS_KEY, WORK_IDENTS_KEY)
     finally:
         ioloop.stop()
     return db

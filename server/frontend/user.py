@@ -59,8 +59,8 @@ class User(Component):
         self.snapshot()
 
     def save(self):
-        yield self._db[self.uid].hset(self.uid, 'basic',
-                        msgpack.dumps(self.as_plain()))
+        yield from self._db[self.uid].hset(self.uid, 'basic',
+                                msgpack.dumps(self.as_plain()))
         logger.debug("User %s saved", self.uid)
 
     def check_frontend(self, frontend_id):
@@ -77,7 +77,7 @@ class User(Component):
 
     @classmethod
     def load(cls, uid, db):
-        packed = yield db[uid].hget(uid, 'basic')
+        packed = yield from db[uid].hget(uid, 'basic')
         return cls(**msgpack.loads(packed, encoding='utf-8'))
 
     def client_view(self):

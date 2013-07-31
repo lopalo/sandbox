@@ -37,7 +37,7 @@ class Root(object):
         self.work_handlers = None # setup later
 
     def get_current_state(self):
-        ret = yield self._db.get_all_objects(USER_IDENTS_KEY)
+        ret = yield from self._db.get_all_objects(USER_IDENTS_KEY)
         users = [user_view(unpack_hash(i)) for i in ret]
         return dict(ident=self._ident,
                     users=users)
@@ -58,7 +58,7 @@ class Root(object):
                     start_val=start_val,
                     finish_val=finish_val,
                     info=info)
-        yield self._db.start_work(ident, start_ts,
+        yield from self._db.start_work(ident, start_ts,
                     args=pack_hash(work.as_plain()))
         self._gateway.pubs.new_work(work=work.as_plain())
         return work
@@ -76,12 +76,13 @@ class Root(object):
             #TODO: set position depending on id of previous location
             pos = (0, 0)
         user['pos'] = pos
+
         cli = self._db.get_client()
-        # pipelining
-        yield [cli.multi(),
-               cli.hmset(UserId(uid), pack_hash(user, to_dict=True)),
-               cli.sadd(USER_IDENTS_KEY, UserId(uid)),
-               cli.execute()]
+        cli.multi(),
+        cli.hmset(UserId(uid), pack_hash(user, to_dict=True)),
+        cli.sadd(USER_IDENTS_KEY, UserId(uid)),
+        yield from cli.execute()
+
         state = yield from self.get_current_state()
         self._gateway.prs(uid).init(state=state)
         self._gateway.pubs.user_connected(user=user_view(user))
@@ -89,11 +90,13 @@ class Root(object):
     @message_receiver(USER_SIGN)
     def move_to(self, uid, target_location):
         #TODO: move to subgenerator "delete_user"
+
         cli = self._db.get_client()
-        yield [cli.multi(),
-               cli.delete(UserId(uid)),
-               cli.srem(USER_IDENTS_KEY, UserId(uid)),
-               cli.execute()]
+        cli.multi(),
+        cli.delete(UserId(uid)),
+        cli.srem(USER_IDENTS_KEY, UserId(uid)),
+        yield from cli.execute()
+
         self._gateway.pubs.user_disconnected(uid=uid)
         ####
         self._gateway.prs(uid).enter(location=target_location)
@@ -101,8 +104,8 @@ class Root(object):
     @message_receiver(INTERNAL_SIGN)
     def update_user(self, uid, user):
         #TODO: resolve rewriting of user's state, use difference instead
-        ret = yield self._db.update_hash_exists(UserId(uid),
-                                       args=pack_hash(user))
+        ret = yield from self._db.update_hash_exists(UserId(uid),
+                                           args=pack_hash(user))
         if ret == 1:
             self._gateway.pubs.user_updated(user=user_view(user))
 
@@ -110,7 +113,7 @@ class Root(object):
     @message_receiver(USER_SIGN)
     def increase_stones(self, uid, duration, amount):
         uid = UserId(uid)
-        stones = int((yield self._db.hget(uid, 'stones')))
+        stones = int((yield from self._db.hget(uid, 'stones')))
         yield from self.start_work(object_id=uid,
                                    work_handler='incr_stones',
                                    duration=duration,

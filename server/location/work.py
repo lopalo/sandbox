@@ -61,7 +61,8 @@ class IncrFieldHandler(WorkHandler):
 
     def accept(self, work, ft, delta, last_tick):
         super().accept(work, ft, delta, last_tick)
-        val = yield self._db.hincrbyfloat(work.object_id, self.field, delta)
+        val = yield from self._db.hincrbyfloat(work.object_id,
+                                                self.field, delta)
         val = round(float(val))
         if last_tick:
             prefix, ident = work.object_id.split(':', 1)
@@ -77,7 +78,7 @@ class WalkHandler(WorkHandler):
         super().accept(work, ft, delta, last_tick)
         #TODO: check obstacles and calculate and serialize new_pos
         new_pos = (1, 1)
-        yield self._db.hset(work.object_id, 'pos', new_pos)
+        yield from self._db.hset(work.object_id, 'pos', new_pos)
         if last_tick:
             #TODO: send to frontend
             pass
@@ -119,15 +120,15 @@ def process_ticks(db, work_handlers, works_per_step=10):
     try:
         while True:
             ts = get_ts()
-            work_lst = yield db.get_work_list(ts, works_per_step)
+            work_lst = yield from db.get_work_list(ts, works_per_step)
             for w in work_lst:
                 w = Work.from_plain(unpack_hash(w))
                 handler = work_handlers[w.work_handler]
                 next_ts = yield from handler.process(w)
                 if next_ts is None:
-                    yield db.cancel_work(w.ident)
+                    yield from db.cancel_work(w.ident)
                 else:
-                    yield db.continue_work(w.ident, next_ts, w.last_ts)
+                    yield from db.continue_work(w.ident, next_ts, w.last_ts)
     except:
         logger.exception('Exception in tick processor:')
 

@@ -8,7 +8,7 @@ from sulaco.outer_server.message_manager import LocationRoot
 from sulaco.utils.receiver import (
     message_receiver, message_router, LoopbackMixin,
     USER_SIGN, INTERNAL_USER_SIGN, INTERNAL_SIGN)
-from sulaco.utils.lock import Lock
+from sulaco.utils.lock import lock_factory
 
 from frontend.user import User
 from frontend.location import Location
@@ -29,13 +29,13 @@ class Root(LocationRoot, LoopbackMixin):
         self._db = dbs['nodes']
         self._name_db = dbs['name_db']
         self._frontend_id = 'frontend_id:' + uuid.uuid4().hex
-        self._lock = Lock()
+        self._lock = lock_factory()
         self._locations = {}
 
     @message_receiver()
     def register(self, username, password, conn, **kwargs):
         assert username != 'db_name'
-        exists = yield self._name_db.exists(username)
+        exists = yield from self._name_db.exists(username)
         if exists:
             conn.s.auth.error(text='username exists')
             return
@@ -51,19 +51,18 @@ class Root(LocationRoot, LoopbackMixin):
                    msgman=self._msgman)
         self._connman.bind_connection_to_uid(conn, uid)
         yield from user.save()
-        yield self._name_db.set(username, uid)
+        yield from self._name_db.set(username, uid)
         conn.s.user.basic_info(data=user.client_view())
         self.lbs.location.enter(uid=uid)
 
     @message_receiver()
     def sign_in(self, username, password, conn, **kwargs):
-        uid = yield self._name_db.get(username)
+        uid = yield from self._name_db.get(username)
         if uid is None:
             conn.s.auth.error(text='unknown username')
             return
         uid = uid.decode('utf-8')
-        yield from self._lock.acquire(uid)
-        try:
+        with (yield from self._lock(uid)):
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
                        connman=self._connman,
@@ -74,16 +73,13 @@ class Root(LocationRoot, LoopbackMixin):
             user.frontend_id = self._frontend_id
             self._connman.bind_connection_to_uid(conn, uid)
             yield from user.save()
-        finally:
-            self._lock.release(uid)
         conn.s.user.basic_info(data=user.client_view())
         self.lbs.location.enter(uid=uid)
 
     @message_router(USER_SIGN)
     def user(self, next_step, uid, **kwargs):
         conn = self._connman.get_connection(uid)
-        yield from self._lock.acquire(uid)
-        try:
+        with (yield from self._lock(uid)):
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
                        connman=self._connman,
@@ -93,8 +89,6 @@ class Root(LocationRoot, LoopbackMixin):
                 return
             yield from next_step(user)
             yield from user.finalize()
-        finally:
-            self._lock.release(uid)
 
     def location_added(self, loc_id, data):
         self._locations[loc_id] = data
@@ -111,9 +105,7 @@ class Root(LocationRoot, LoopbackMixin):
     @message_router(INTERNAL_USER_SIGN, pass_sign=True)
     def location(self, next_step, sign, uid, location=None,
                                 _update_in_loc=True, **kwargs):
-        yield from self._lock.acquire(uid)
-        #TODO: use context manager
-        try:
+        with (yield from self._lock(uid)):
             #TODO: use Location.step_is_proxy(next_step) to decide to load user
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
@@ -143,6 +135,4 @@ class Root(LocationRoot, LoopbackMixin):
                                 config=self._config)
             yield from next_step(location)
             yield from user.finalize(update_location=_update_in_loc)
-        finally:
-            self._lock.release(uid)
 
