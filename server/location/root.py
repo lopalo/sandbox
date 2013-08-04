@@ -20,7 +20,8 @@ def user_view(user):
 
 class Root(object):
     ###
-    # WARNING: try to use only atomic db operations, otherwise use redis lock
+    # WARNING: Try to use only atomic db operations, otherwise use redis lock.
+    #          No yield inside redis transactions.
     ###
 
     #TODO: Resolve race condition in synchronization between frontend and location

@@ -8,7 +8,7 @@ from sulaco.outer_server.message_manager import LocationRoot
 from sulaco.utils.receiver import (
     message_receiver, message_router, LoopbackMixin,
     USER_SIGN, INTERNAL_USER_SIGN, INTERNAL_SIGN)
-from sulaco.utils.lock import lock_factory
+from sulaco.utils.lock import Lock
 
 from frontend.user import User
 from frontend.location import Location
@@ -29,7 +29,7 @@ class Root(LocationRoot, LoopbackMixin):
         self._db = dbs['nodes']
         self._name_db = dbs['name_db']
         self._frontend_id = 'frontend_id:' + uuid.uuid4().hex
-        self._lock = lock_factory()
+        self._lock = Lock()
         self._locations = {}
 
     @message_receiver()
@@ -62,7 +62,7 @@ class Root(LocationRoot, LoopbackMixin):
             conn.s.auth.error(text='unknown username')
             return
         uid = uid.decode('utf-8')
-        with (yield from self._lock(uid)):
+        with (yield from self._lock.atomic(uid)):
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
                        connman=self._connman,
@@ -79,7 +79,7 @@ class Root(LocationRoot, LoopbackMixin):
     @message_router(USER_SIGN)
     def user(self, next_step, uid, **kwargs):
         conn = self._connman.get_connection(uid)
-        with (yield from self._lock(uid)):
+        with (yield from self._lock.atomic(uid)):
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
                        connman=self._connman,
@@ -105,7 +105,7 @@ class Root(LocationRoot, LoopbackMixin):
     @message_router(INTERNAL_USER_SIGN, pass_sign=True)
     def location(self, next_step, sign, uid, location=None,
                                 _update_in_loc=True, **kwargs):
-        with (yield from self._lock(uid)):
+        with (yield from self._lock.atomic(uid)):
             #TODO: use Location.step_is_proxy(next_step) to decide to load user
             user = yield from User.load(uid, self._db)
             user.setup(db=self._db,
